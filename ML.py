@@ -2,7 +2,7 @@ import pandas as pd
 import json
 import sys
 import os
-import gspread
+# import gspread
 import traceback
 import time
 from google.oauth2.service_account import Credentials
@@ -27,28 +27,28 @@ def get_stock_data(symbol):
         time.sleep(1)
     return None
 
-def write_to_google_sheet(data, spreadsheet_id, sheet_name):
-    """Writes a pandas DataFrame to the specified Google Sheet."""
-    credentials_path = "D:\College\\Credentials.json"
-    if not credentials_path or not os.path.exists(credentials_path):
-        raise FileNotFoundError(f"GOOGLE_APPLICATION_CREDENTIALS not set or path is invalid.")
-    creds = Credentials.from_service_account_file(
-        credentials_path, scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    )
-    gc = gspread.authorize(creds)
-    sh = gc.open_by_key(spreadsheet_id)
-    try:
-        worksheet = sh.worksheet(sheet_name)
-    except gspread.WorksheetNotFound:
-        worksheet = sh.add_worksheet(title=sheet_name, rows="1000", cols="20")
-    worksheet.clear()
-    data_to_write = data.reset_index()
-    date_col = 'Date' if 'Date' in data_to_write.columns else 'Datetime'
-    data_to_write[date_col] = pd.to_datetime(data_to_write[date_col]).dt.strftime('%Y-%m-%d')
-    headers = data_to_write.columns.tolist()
-    rows = data_to_write.astype(str).values.tolist()
-    worksheet.append_row(headers, value_input_option='USER_ENTERED')
-    worksheet.append_rows(rows, value_input_option='USER_ENTERED')
+# def write_to_google_sheet(data, spreadsheet_id, sheet_name):
+#     """Writes a pandas DataFrame to the specified Google Sheet."""
+#     credentials_path = "D:\College\\Credentials.json"
+#     if not credentials_path or not os.path.exists(credentials_path):
+#         raise FileNotFoundError(f"GOOGLE_APPLICATION_CREDENTIALS not set or path is invalid.")
+#     creds = Credentials.from_service_account_file(
+#         credentials_path, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+#     )
+#     gc = gspread.authorize(creds)
+#     sh = gc.open_by_key(spreadsheet_id)
+#     try:
+#         worksheet = sh.worksheet(sheet_name)
+#     except gspread.WorksheetNotFound:
+#         worksheet = sh.add_worksheet(title=sheet_name, rows="1000", cols="20")
+#     worksheet.clear()
+#     data_to_write = data.reset_index()
+#     date_col = 'Date' if 'Date' in data_to_write.columns else 'Datetime'
+#     data_to_write[date_col] = pd.to_datetime(data_to_write[date_col]).dt.strftime('%Y-%m-%d')
+#     headers = data_to_write.columns.tolist()
+#     rows = data_to_write.astype(str).values.tolist()
+#     worksheet.append_row(headers, value_input_option='USER_ENTERED')
+#     worksheet.append_rows(rows, value_input_option='USER_ENTERED')
 
 def create_features_and_target(df):
     """Engineers features and creates the target variable for the ML model."""
@@ -132,12 +132,12 @@ def main():
         except Exception as prediction_error:
             response["prediction_error"] = f"Could not generate prediction: {prediction_error}"
 
-        try:
-            spreadsheet_id = "1TyGJxTKT-D0nj3JrCMJGbqhq39m8lwxweybZFh3NpOs"
-            write_to_google_sheet(full_stock_data, spreadsheet_id, stock_symbol)
-            response["google_sheet_status"] = f"Successfully wrote data to Google Sheet '{stock_symbol}'."
-        except Exception as sheet_error:
-            response["google_sheet_status"] = f"Failed to write to Google Sheet: {sheet_error}"
+        # try:
+        #     spreadsheet_id = "1TyGJxTKT-D0nj3JrCMJGbqhq39m8lwxweybZFh3NpOs"
+        #     write_to_google_sheet(full_stock_data, spreadsheet_id, stock_symbol)
+        #     response["google_sheet_status"] = f"Successfully wrote data to Google Sheet '{stock_symbol}'."
+        # except Exception as sheet_error:
+        #     response["google_sheet_status"] = f"Failed to write to Google Sheet: {sheet_error}"
 
     except Exception as e:
         response = {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
