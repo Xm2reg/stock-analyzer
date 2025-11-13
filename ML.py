@@ -2,11 +2,11 @@ import pandas as pd
 import json
 import sys
 import os
-import gspread
+# import gspread
 import traceback
 import time
-from google.oauth2.service_account import Credentials
-import yfinance as yf
+# from google.oauth2.service_account import Credentials
+# import yfinance as yf
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 
@@ -14,41 +14,59 @@ def get_stock_data(symbol):
     """
     Fetches daily stock data using Yahoo Finance, automatically retrying on failure.
     """
+    # Replace yfinance with Alpha Vantage
+    from alpha_vantage.timeseries import TimeSeries
+    
+    # Replace with your Alpha Vantage API key
+    alpha_vantage_api_key = "TAJUW1I4C77TYVI8"  
+    
     fetch_symbol = symbol
     for attempt in range(3):
         try:
-            ticker = yf.Ticker(fetch_symbol)
-            data = ticker.history(period="2y")
-            if not data.empty:
-                data = data[['Open', 'High', 'Low', 'Close', 'Volume']]
+            # Initialize Alpha Vantage time series object
+            ts = TimeSeries(key=alpha_vantage_api_key, output_format='pandas')
+            
+            # Fetch daily data
+            data, meta_data = ts.get_daily(symbol=fetch_symbol, outputsize='full')
+            
+            if data is not None and not data.empty:
+                # Rename columns to lowercase
+                data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+                
+                # Invert the order of the dataframe
+                data = data[::-1]
+
                 return data
+            else:
+                print(f"No data found for symbol {fetch_symbol} using Alpha Vantage.")
+                
         except Exception as e:
             print(f"Attempt {attempt + 1} for {fetch_symbol} failed with error: {e}. Retrying...")
         time.sleep(1)
     return None
 
-def write_to_google_sheet(data, spreadsheet_id, sheet_name):
-    """Writes a pandas DataFrame to the specified Google Sheet."""
-    credentials_path = "D:\College\\Credentials.json"
-    if not credentials_path or not os.path.exists(credentials_path):
-        raise FileNotFoundError(f"GOOGLE_APPLICATION_CREDENTIALS not set or path is invalid.")
-    creds = Credentials.from_service_account_file(
-        credentials_path, scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    )
-    gc = gspread.authorize(creds)
-    sh = gc.open_by_key(spreadsheet_id)
-    try:
-        worksheet = sh.worksheet(sheet_name)
-    except gspread.WorksheetNotFound:
-        worksheet = sh.add_worksheet(title=sheet_name, rows="1000", cols="20")
-    worksheet.clear()
-    data_to_write = data.reset_index()
-    date_col = 'Date' if 'Date' in data_to_write.columns else 'Datetime'
-    data_to_write[date_col] = pd.to_datetime(data_to_write[date_col]).dt.strftime('%Y-%m-%d')
-    headers = data_to_write.columns.tolist()
-    rows = data_to_write.astype(str).values.tolist()
-    worksheet.append_row(headers, value_input_option='USER_ENTERED')
-    worksheet.append_rows(rows, value_input_option='USER_ENTERED')
+# def write_to_google_sheet(data, spreadsheet_id, sheet_name):
+#     """Writes a pandas DataFrame to the specified Google Sheet."""
+#     credentials_path = "D:\College\\Credentials.json"
+#     if not credentials_path or not os.path.exists(credentials_path):
+#         raise FileNotFoundError(f"GOOGLE_APPLICATION_CREDENTIALS not set or path is invalid.")
+#     creds = Credentials.from_service_account_file(
+#         credentials_path, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+#     )
+#     gc = gspread.authorize(creds)
+#     sh = gc.open_by_key(spreadsheet_id)
+#     try:
+#         worksheet = sh.worksheet(sheet_name)
+#     except gspread.WorksheetNotFound:
+#         worksheet = sh.add_worksheet(title=sheet_name, rows="1000", cols="20")
+#     worksheet.clear()
+#     data_to_write = data.reset_index()
+#     date_col = 'Date' if 'Date' in data_to_write.columns else 'Datetime'
+#     data_to_write[date_col] = pd.to_datetime(data_to_write[date_col]).dt.strftime('%Y-%m-%d')
+#     headers = data_to_write.columns.tolist()
+#     rows = data_to_write.astype(str).values.tolist()
+#     worksheet.append_row(headers, value_input_option='USER_ENTERED')
+#     worksheet.append_rows(rows, value_input_option='USER_ENTERED')
 
 def create_features_and_target(df):
     """Engineers features and creates the target variable for the ML model."""
@@ -132,12 +150,12 @@ def main():
         except Exception as prediction_error:
             response["prediction_error"] = f"Could not generate prediction: {prediction_error}"
 
-        try:
-            spreadsheet_id = "1TyGJxTKT-D0nj3JrCMJGbqhq39m8lwxweybZFh3NpOs"
-            write_to_google_sheet(full_stock_data, spreadsheet_id, stock_symbol)
-            response["google_sheet_status"] = f"Successfully wrote data to Google Sheet '{stock_symbol}'."
-        except Exception as sheet_error:
-            response["google_sheet_status"] = f"Failed to write to Google Sheet: {sheet_error}"
+        # try:
+        #     spreadsheet_id = "1TyGJxTKT-D0nj3JrCMJGbqhq39m8lwxweybZFh3NpOs"
+        #     write_to_google_sheet(full_stock_data, spreadsheet_id, stock_symbol)
+        #     response["google_sheet_status"] = f"Successfully wrote data to Google Sheet '{stock_symbol}'."
+        # except Exception as sheet_error:
+        #     response["google_sheet_status"] = f"Failed to write to Google Sheet: {sheet_error}"
 
     except Exception as e:
         response = {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
