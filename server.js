@@ -2,14 +2,10 @@ const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
 const cors = require('cors');
-require('dotenv').config(); // Import dotenv and call the config function.
 
 const app = express();
 app.use(express.json());
-app.use(cors("*"));
-
-// The .env file should contain your ALPHA_VANTAGE_API_KEY.
-// The python script can access it via os.environ.
+app.use(cors()); // Allow all origins
 
 app.post('/get-stock-data', (req, res) => {
     const { stock_symbol } = req.body;
@@ -18,16 +14,23 @@ app.post('/get-stock-data', (req, res) => {
         return res.status(400).json({ error: "Stock symbol is required" });
     }
 
+    // Adjust 'ML.py' if it is in a subfolder, e.g., path.resolve(__dirname, 'scripts', 'ML.py')
     const pythonScriptPath = path.resolve(__dirname, 'ML.py');
-    const pythonProcess = spawn('python', [pythonScriptPath, JSON.stringify({ stock_symbol })]);
+    
+    // Check operating system to use 'python' or 'python3'
+    const pythonCommand = process.platform === "win32" ? "python" : "python3";
+
+    const pythonProcess = spawn(pythonCommand, [pythonScriptPath, JSON.stringify({ stock_symbol })]);
 
     let output = '';
     let errorOutput = '';
 
+    // Collect data from Python script
     pythonProcess.stdout.on('data', (data) => {
         output += data.toString();
     });
 
+    // Collect errors (if any)
     pythonProcess.stderr.on('data', (data) => {
         errorOutput += data.toString();
     });
@@ -35,28 +38,34 @@ app.post('/get-stock-data', (req, res) => {
     pythonProcess.on('close', (code) => {
         if (code !== 0) {
             console.error(`Python script exited with code ${code}`);
-            return res.status(500).json({ error: `Python script error: ${errorOutput}` });
+            console.error(`Error details: ${errorOutput}`);
+            return res.status(500).json({ error: "Python script execution failed", details: errorOutput });
         }
         
         try {
-            const parsedOutput = JSON.parse(output);
+            // Robust JSON extraction:
+            // Sometimes Python prints warnings before the actual JSON.
+            // We look for the first '{' and the last '}' to extract the valid JSON object.
+            const jsonStartIndex = output.indexOf('{');
+            const jsonEndIndex = output.lastIndexOf('}');
 
-            if (parsedOutput.status === "error") {
-               
-                return res.status(500).json(parsedOutput);
+            if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
+                const cleanJsonString = output.substring(jsonStartIndex, jsonEndIndex + 1);
+                const parsedOutput = JSON.parse(cleanJsonString);
+
+                if (parsedOutput.status === "error") {
+                    return res.status(500).json(parsedOutput);
+                } else {
+                    return res.status(200).json(parsedOutput);
+                }
             } else {
-                return res.status(200).json(parsedOutput);
+                throw new Error("No valid JSON found in Python output");
             }
         } catch (parseError) {
-           
-            console.error("Error parsing JSON output from Python:", output);
+            console.error("JSON Parse Error:", parseError);
+            console.error("Raw Output received:", output);
             return res.status(500).json({ error: "Failed to process Python output" });
         }
-    });
-
-    pythonProcess.on('error', (err) => {
-        console.error('Failed to start Python process:', err);
-        res.status(500).json({ error: 'Failed to start Python process' });
     });
 });
 
